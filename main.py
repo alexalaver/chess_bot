@@ -203,8 +203,9 @@ async def other_buttons(callback_query: types.CallbackQuery):
                 two_user_id = db.check_queue()
                 db.delete_queue_chess()
                 db.add_game_chess(user_id, two_user_id)
-                await callback_query.message.answer(text=cfg.chess_game_begin, reply_markup=markup_inline)
-                await callback_query.bot.send_message(chat_id=two_user_id,text=cfg.chess_game_begin, reply_markup=markup_inline)
+                message = await callback_query.message.edit_text(text=cfg.chess_game_begin, reply_markup=markup_inline)
+                await callback_query.message.edit_text(text=cfg.chess_game_begin, reply_markup=markup_inline)
+                await callback_query.bot.edit_message_text(chat_id=two_user_id,message_id=message.message_id, text=cfg.chess_game_begin, reply_markup=markup_inline)
         elif callback_query.data == "cancel_chess_queue":
             if db.check_queue():
                 db.delete_queue_chess()
