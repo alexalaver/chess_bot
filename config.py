@@ -4,7 +4,7 @@ def begin_text(user):
 
 button_profile = "👨‍🌾 Профиль 👨‍🌾"
 button_game = "🎮 Игры 🎮"
-button_support = "💻 Тех. Поддержка 💻"
+button_support = "Тех. Поддержка"
 button_settings = "🎚️ Настройки 🎚️"
 
 button_chess = "♟ Шахматы ♟"
@@ -18,10 +18,20 @@ def game_enter_text(user):
 queue_text = "⌛ Вы добавлены в очередь, пожалуйста ожидайте ⌛"
 cancel_game_notification = "Вы успешно отменили очередь ✅"
 
-chess_game_begin = "🎮 Игра в шахматы ⚠ началась. Желаем вам удачи!\n\nЕсли вы хотите прекратить игру, напишите команду /cancel ❌"
+chess_game_begin = "🎮 Игра в шахматы ⚠ началась. Вы играете за белых ⚪\n\nЕсли вы хотите прекратить игру, напишите команду /cancel ❌ "
+chess_game_begin_two = "🎮 Игра в шахматы ⚠ началась. Вы играете за чёрных ⚫\n\nЕсли вы хотите прекратить игру, напишите команду /cancel ❌"
 cancel_text = "Вы успешно прекратили игру ✅"
 cancel_text_two = "Ваш соперник прекратил с вами игру ❌"
 
+chess_white_figure = ["♙", "♘", "♗", "♖", "♕", "♔"]
+chess_black_figure = ["♟", "♞", "♝", "♜", "♛", "♚"]
+
+error_figure_text_white = "Вы играете за белых!"
+error_figure_text_black = "Вы играете за чёрных!"
+
+not_in_game = "Вы не находитесь в игре!"
+
+error_queue_in_game = "Сейчас не ваша очередь!"
 
 
 

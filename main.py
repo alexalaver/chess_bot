@@ -3,6 +3,8 @@ from data import DataBasa
 import config as cfg
 import functions as fnc
 import logging
+import buttons as bts
+import chess
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,75 +13,110 @@ bot = Bot(cfg.TOKEN)
 dp = Dispatcher(bot)
 db = DataBasa("localhost", "5432", "chess", "chess_user", "chess_pass")
 
+piece_to_emoji = {
+    'P': "♙", 'N': "♘", 'B': "♗", 'R': "♖", 'Q': "♕", 'K': "♔",
+    'p': "♟", 'n': "♞", 'b': "♝", 'r': "♜", 'q': "♛", 'k': "♚"
+}
 
-async def buttons_chess():
-    markup_inline = types.InlineKeyboardMarkup(row_width=8)
-    markup_inline.add(
-        types.InlineKeyboardButton("♜", callback_data="♜ 1"),
-        types.InlineKeyboardButton("♞", callback_data="♞ 2"),
-        types.InlineKeyboardButton("♝", callback_data="♝ 3"),
-        types.InlineKeyboardButton("♛", callback_data="♛ 4"),
-        types.InlineKeyboardButton("♚", callback_data="♚ 5"),
-        types.InlineKeyboardButton("♝", callback_data="♝ 6"),
-        types.InlineKeyboardButton("♞", callback_data="♞ 7"),
-        types.InlineKeyboardButton("♜", callback_data="♜ 8"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 9"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 10"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 11"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 12"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 13"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 14"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 15"),
-        types.InlineKeyboardButton("♟", callback_data="♟ 16"),
-        types.InlineKeyboardButton(" ", callback_data="17"),
-        types.InlineKeyboardButton(" ", callback_data="18"),
-        types.InlineKeyboardButton(" ", callback_data="19"),
-        types.InlineKeyboardButton(" ", callback_data="20"),
-        types.InlineKeyboardButton(" ", callback_data="21"),
-        types.InlineKeyboardButton(" ", callback_data="22"),
-        types.InlineKeyboardButton(" ", callback_data="23"),
-        types.InlineKeyboardButton(" ", callback_data="24"),
-        types.InlineKeyboardButton(" ", callback_data="25"),
-        types.InlineKeyboardButton(" ", callback_data="26"),
-        types.InlineKeyboardButton(" ", callback_data="27"),
-        types.InlineKeyboardButton(" ", callback_data="28"),
-        types.InlineKeyboardButton(" ", callback_data="29"),
-        types.InlineKeyboardButton(" ", callback_data="30"),
-        types.InlineKeyboardButton(" ", callback_data="31"),
-        types.InlineKeyboardButton(" ", callback_data="32"),
-        types.InlineKeyboardButton(" ", callback_data="33"),
-        types.InlineKeyboardButton(" ", callback_data="34"),
-        types.InlineKeyboardButton(" ", callback_data="35"),
-        types.InlineKeyboardButton(" ", callback_data="36"),
-        types.InlineKeyboardButton(" ", callback_data="37"),
-        types.InlineKeyboardButton(" ", callback_data="38"),
-        types.InlineKeyboardButton(" ", callback_data="39"),
-        types.InlineKeyboardButton(" ", callback_data="40"),
-        types.InlineKeyboardButton(" ", callback_data="41"),
-        types.InlineKeyboardButton(" ", callback_data="42"),
-        types.InlineKeyboardButton(" ", callback_data="43"),
-        types.InlineKeyboardButton(" ", callback_data="44"),
-        types.InlineKeyboardButton(" ", callback_data="45"),
-        types.InlineKeyboardButton(" ", callback_data="46"),
-        types.InlineKeyboardButton(" ", callback_data="47"),
-        types.InlineKeyboardButton(" ", callback_data="48"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 49"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 50"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 51"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 52"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 53"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 54"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 55"),
-        types.InlineKeyboardButton("♙", callback_data="♙ 56"),
-        types.InlineKeyboardButton("♖", callback_data="♖ 57"),
-        types.InlineKeyboardButton("♘", callback_data="♘ 58"),
-        types.InlineKeyboardButton("♗", callback_data="♗ 59"),
-        types.InlineKeyboardButton("♕", callback_data="♕ 60"),
-        types.InlineKeyboardButton("♔", callback_data="♔ 61"),
-        types.InlineKeyboardButton("♗", callback_data="♗ 62"),
-        types.InlineKeyboardButton("♘", callback_data="♘ 63"),
-        types.InlineKeyboardButton("♖", callback_data="♖ 64"),
-    )
+def create_board_keyboard(board, highlight_moves=None):
+    highlight_moves = highlight_moves or set()
+    keyboard = types.InlineKeyboardMarkup()
+    for rank in reversed(range(8)):
+        row = []
+        for file in range(8):
+            square = chess.square(file, rank)
+            piece = board.piece_at(square)
+            emoji = piece_to_emoji.get(piece.symbol(), ' ') if piece else ' '
+            callback_data = f"square:{chess.square_name(square)}"
+            if square in highlight_moves:
+                callback_data = f"move:{chess.square_name(square)}"
+                emoji = f"*{emoji}*"
+            row.append(types.InlineKeyboardButton(emoji, callback_data=callback_data))
+        keyboard.row(*row)
+    return keyboard
+
+def create_promotion_keyboard():
+    keyboard = types.InlineKeyboardMarkup(row_width=4)
+    pieces = ["q", "r", "b", "n"]
+    for piece in pieces:
+        button = types.InlineKeyboardButton(piece_to_emoji[piece.upper()], callback_data=f"promote_to:{piece}")
+        keyboard.insert(button)
+    return keyboard
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('square:'))
+async def select_square(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    if db.check_game(user_id):
+        board = chess.Board(db.select_board(user_id))
+        white_player_id, black_player_id = db.select_players(user_id)
+        if (board.turn == chess.WHITE and callback_query.from_user.id != white_player_id) or \
+           (board.turn == chess.BLACK and callback_query.from_user.id != black_player_id):
+            await callback_query.answer("Сейчас не ваш ход")
+            return
+        message_id = db.check_message_ids(user_id)
+        two_user_id = db.check_two_user_id(user_id)
+        square = chess.square(chess.FILE_NAMES.index(callback_query.data.split(':')[1][0]), int(callback_query.data.split(':')[1][1]) - 1)
+        db.update_square(user_id, square)
+        moves = [move.to_square for move in board.legal_moves if move.from_square == square]
+        if not moves:
+            await callback_query.answer("Нет доступных ходов")
+            return
+        keyboard = create_board_keyboard(board, highlight_moves=set(moves))
+        await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
+        await bot.edit_message_reply_markup(callback_query.from_user.id, callback_query.message.message_id, reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('move:'))
+async def make_move(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    if db.check_game(user_id):
+        selected_square = db.selected_square(user_id)
+        if selected_square is None:
+            await callback_query.answer("Ошибка: начальная клетка не выбрана.")
+            return
+        two_user_id = db.check_two_user_id(user_id)
+        fen = db.select_board(user_id)
+        board = chess.Board(fen)
+        to_square = chess.square(chess.FILE_NAMES.index(callback_query.data.split(':')[1][0]), int(callback_query.data.split(':')[1][1]) - 1)
+        message_id = db.check_message_ids(user_id)
+        move = chess.Move(selected_square, to_square)
+        if move in board.legal_moves:
+            is_promotion = (board.piece_type_at(move.from_square) == chess.PAWN and
+                            (chess.square_rank(move.to_square) == 0 or chess.square_rank(move.to_square) == 7))
+            if is_promotion:
+                promotion_square = move.to_square
+                db.update_promotion_square(user_id, promotion_square)
+                keyboard = create_promotion_keyboard()
+                await bot.send_message(callback_query.from_user.id, "Выберите фигуру для превращения пешки", reply_markup=keyboard)
+            else:
+                board.push(move)
+                fen = board.fen()
+                db.update_board(user_id, fen)
+                keyboard = create_board_keyboard(board)
+                await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
+                await bot.edit_message_reply_markup(callback_query.from_user.id, callback_query.message.message_id, reply_markup=keyboard)
+        else:
+            await callback_query.answer("Невозможный ход")
+
+        if board.is_checkmate():
+            await bot.send_message(callback_query.from_user.id, "МАТ СДЕЛАН")
+
+
+@dp.callback_query_handler(lambda c: c.data and c.data.startswith('promote_to:'))
+async def promote_pawn(callback_query: types.CallbackQuery):
+    user_id = callback_query.from_user.id
+    if db.check_game(user_id):
+        selected_square = db.selected_square(user_id)
+        promotion_square = db.select_promotion_square(user_id)
+        board = chess.Board(db.select_board(user_id))
+        promote_to = callback_query.data.split(':')[1]
+        move = chess.Move(selected_square, promotion_square, chess.Piece.from_symbol(promote_to.upper()))
+
+        if move in board.legal_moves:
+            board.push(move)
+            keyboard = create_board_keyboard(board)
+            await bot.edit_message_text(chat_id=callback_query.message.chat.id, message_id=callback_query.message.message_id, text="Доска обновлена", reply_markup=keyboard)
+        else:
+            await callback_query.answer("Невозможный ход")
 
 
 @dp.message_handler(commands=['start'])
@@ -112,11 +149,10 @@ async def other_text(message: types.Message):
                 await message.answer(cfg.game_enter_text(fnc.nick_with_link("пользователь", user_id)), reply_markup=markup_inline, parse_mode=types.ParseMode.MARKDOWN)
         elif db.check_game(user_id):
             if message.text == "/cancel":
-                markup_inline = await buttons_chess()
                 two_user_id = db.check_two_user_id(user_id)
                 db.delete_game_chess(user_id)
-                await message.answer(cfg.cancel_text, reply_markup=markup_inline)
-                await dp.bot.send_message(two_user_id, cfg.cancel_text_two, reply_markup=markup_inline)
+                await message.answer(cfg.cancel_text)
+                await dp.bot.send_message(two_user_id, cfg.cancel_text_two)
         else:
             await message.answer(cfg.error_command_text_game)
 
@@ -130,84 +166,20 @@ async def other_buttons(callback_query: types.CallbackQuery):
                 markup_inline.add(
                     types.InlineKeyboardButton(cfg.button_cancel, callback_data="cancel_chess_queue")
                 )
-                db.add_queue_chess(user_id)
-                await callback_query.message.edit_text(text=cfg.queue_text, reply_markup=markup_inline)
+                message = await callback_query.message.edit_text(text=cfg.queue_text, reply_markup=markup_inline)
+                db.add_queue_chess(user_id, message.message_id)
             elif db.check_queue() is not None:
-                markup_inline = types.InlineKeyboardMarkup(row_width=8)
-                markup_inline.add(
-                    types.InlineKeyboardButton("♜", callback_data="♜ 1"),
-                    types.InlineKeyboardButton("♞", callback_data="♞ 2"),
-                    types.InlineKeyboardButton("♝", callback_data="♝ 3"),
-                    types.InlineKeyboardButton("♛", callback_data="♛ 4"),
-                    types.InlineKeyboardButton("♚", callback_data="♚ 5"),
-                    types.InlineKeyboardButton("♝", callback_data="♝ 6"),
-                    types.InlineKeyboardButton("♞", callback_data="♞ 7"),
-                    types.InlineKeyboardButton("♜", callback_data="♜ 8"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 9"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 10"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 11"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 12"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 13"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 14"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 15"),
-                    types.InlineKeyboardButton("♟", callback_data="♟ 16"),
-                    types.InlineKeyboardButton(" ", callback_data="17"),
-                    types.InlineKeyboardButton(" ", callback_data="18"),
-                    types.InlineKeyboardButton(" ", callback_data="19"),
-                    types.InlineKeyboardButton(" ", callback_data="20"),
-                    types.InlineKeyboardButton(" ", callback_data="21"),
-                    types.InlineKeyboardButton(" ", callback_data="22"),
-                    types.InlineKeyboardButton(" ", callback_data="23"),
-                    types.InlineKeyboardButton(" ", callback_data="24"),
-                    types.InlineKeyboardButton(" ", callback_data="25"),
-                    types.InlineKeyboardButton(" ", callback_data="26"),
-                    types.InlineKeyboardButton(" ", callback_data="27"),
-                    types.InlineKeyboardButton(" ", callback_data="28"),
-                    types.InlineKeyboardButton(" ", callback_data="29"),
-                    types.InlineKeyboardButton(" ", callback_data="30"),
-                    types.InlineKeyboardButton(" ", callback_data="31"),
-                    types.InlineKeyboardButton(" ", callback_data="32"),
-                    types.InlineKeyboardButton(" ", callback_data="33"),
-                    types.InlineKeyboardButton(" ", callback_data="34"),
-                    types.InlineKeyboardButton(" ", callback_data="35"),
-                    types.InlineKeyboardButton(" ", callback_data="36"),
-                    types.InlineKeyboardButton(" ", callback_data="37"),
-                    types.InlineKeyboardButton(" ", callback_data="38"),
-                    types.InlineKeyboardButton(" ", callback_data="39"),
-                    types.InlineKeyboardButton(" ", callback_data="40"),
-                    types.InlineKeyboardButton(" ", callback_data="41"),
-                    types.InlineKeyboardButton(" ", callback_data="42"),
-                    types.InlineKeyboardButton(" ", callback_data="43"),
-                    types.InlineKeyboardButton(" ", callback_data="44"),
-                    types.InlineKeyboardButton(" ", callback_data="45"),
-                    types.InlineKeyboardButton(" ", callback_data="46"),
-                    types.InlineKeyboardButton(" ", callback_data="47"),
-                    types.InlineKeyboardButton(" ", callback_data="48"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 49"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 50"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 51"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 52"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 53"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 54"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 55"),
-                    types.InlineKeyboardButton("♙", callback_data="♙ 56"),
-                    types.InlineKeyboardButton("♖", callback_data="♖ 57"),
-                    types.InlineKeyboardButton("♘", callback_data="♘ 58"),
-                    types.InlineKeyboardButton("♗", callback_data="♗ 59"),
-                    types.InlineKeyboardButton("♕", callback_data="♕ 60"),
-                    types.InlineKeyboardButton("♔", callback_data="♔ 61"),
-                    types.InlineKeyboardButton("♗", callback_data="♗ 62"),
-                    types.InlineKeyboardButton("♘", callback_data="♘ 63"),
-                    types.InlineKeyboardButton("♖", callback_data="♖ 64"),
-                )
-                two_user_id = db.check_queue()
+                two_user_id = db.check_queue()[0]
+                two_user_message_id = db.check_queue()[1]
                 db.delete_queue_chess()
-                db.add_game_chess(user_id, two_user_id)
-                message = await callback_query.message.edit_text(text=cfg.chess_game_begin, reply_markup=markup_inline)
-                await callback_query.message.edit_text(text=cfg.chess_game_begin, reply_markup=markup_inline)
-                await callback_query.bot.edit_message_text(chat_id=two_user_id,message_id=message.message_id, text=cfg.chess_game_begin, reply_markup=markup_inline)
+                board = chess.Board()
+                fen = board.fen()
+                keyboard = create_board_keyboard(board)
+                message_ids = await callback_query.message.edit_text(text=cfg.chess_game_begin, reply_markup=keyboard)
+                db.add_game_chess(user_id, two_user_id, two_user_message_id, message_ids.message_id, fen)
+                await callback_query.bot.edit_message_text(chat_id=two_user_id, message_id=two_user_message_id, text=cfg.chess_game_begin_two, reply_markup=keyboard)
         elif callback_query.data == "cancel_chess_queue":
-            if db.check_queue():
+            if db.check_queue() is not None:
                 db.delete_queue_chess()
                 markup_inline = types.InlineKeyboardMarkup(row_width=2)
                 markup_inline.add(
@@ -215,6 +187,8 @@ async def other_buttons(callback_query: types.CallbackQuery):
                 )
                 await callback_query.answer(cfg.cancel_game_notification, show_alert=True)
                 await callback_query.message.edit_text(cfg.game_enter_text(fnc.nick_with_link("пользователь", user_id)), reply_markup=markup_inline, parse_mode=types.ParseMode.MARKDOWN)
+
+
 
 
 
