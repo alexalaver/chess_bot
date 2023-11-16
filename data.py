@@ -41,9 +41,15 @@ class DataBasa:
 
     def check_message_ids(self, id):
         with self.connect:
-            self.cursor.execute(f"SELECT CASE WHEN id_1 = {id} THEN message_id_two WHEN id_2 = {id} THEN message_id END AS selected_id FROM chess_game")
-            a = self.cursor.fetchone()
-            return a[0]
+            self.cursor.execute("SELECT id_1 FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
+            user_id = self.cursor.fetchone()[0]
+            if user_id == id:
+                self.cursor.execute("SELECT message_id_two FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
+                return self.cursor.fetchone()[0]
+            else:
+                self.cursor.execute("SELECT message_id FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
+                return self.cursor.fetchone()[0]
+
 
     def check_figure_white_id(self, id):
         with self.connect:
@@ -94,8 +100,14 @@ class DataBasa:
 
     def select_message_id_chess(self, id):
         with self.connect:
-            self.cursor.execute("SELECT message_id FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
-            return self.cursor.fetchone()[0]
+            self.cursor.execute("SELECT id_1 FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
+            user_id = self.cursor.fetchone()[0]
+            if user_id == id:
+                self.cursor.execute("SELECT message_id FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
+                return self.cursor.fetchone()[0]
+            else:
+                self.cursor.execute("SELECT message_id_two FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
+                return self.cursor.fetchone()[0]
 
     def delete_game_chess(self, id):
         with self.connect:
@@ -157,7 +169,14 @@ class DataBasa:
     def selected_square(self, id):
         with self.connect:
             self.cursor.execute("SELECT selected_square FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
-            return int(self.cursor.fetchone()[0])
+            result = self.cursor.fetchone()
+            if result and result[0] is not None:
+                try:
+                    return int(result[0])
+                except ValueError:
+                    return None
+            else:
+                return None
 
     def select_players(self, id):
         with self.connect:

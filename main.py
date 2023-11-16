@@ -1,5 +1,6 @@
 from aiogram import Bot, Dispatcher, types, executor
 from data import DataBasa
+from aiogram.utils.exceptions import MessageNotModified
 import config as cfg
 import functions as fnc
 import logging
@@ -30,10 +31,11 @@ def create_board_keyboard(board, highlight_moves=None):
             callback_data = f"square:{chess.square_name(square)}"
             if square in highlight_moves:
                 callback_data = f"move:{chess.square_name(square)}"
-                emoji = f"*{emoji}*"
+                emoji = "**"
             row.append(types.InlineKeyboardButton(emoji, callback_data=callback_data))
         keyboard.row(*row)
     return keyboard
+
 
 def create_promotion_keyboard():
     keyboard = types.InlineKeyboardMarkup(row_width=4)
@@ -49,21 +51,33 @@ async def select_square(callback_query: types.CallbackQuery):
     if db.check_game(user_id):
         board = chess.Board(db.select_board(user_id))
         white_player_id, black_player_id = db.select_players(user_id)
-        if (board.turn == chess.WHITE and callback_query.from_user.id != white_player_id) or \
-           (board.turn == chess.BLACK and callback_query.from_user.id != black_player_id):
+        if (board.turn == chess.WHITE and user_id != white_player_id) or \
+           (board.turn == chess.BLACK and user_id != black_player_id):
             await callback_query.answer("Сейчас не ваш ход")
             return
-        message_id = db.check_message_ids(user_id)
-        two_user_id = db.check_two_user_id(user_id)
+
+        message_id_two = db.check_message_ids(user_id)
         square = chess.square(chess.FILE_NAMES.index(callback_query.data.split(':')[1][0]), int(callback_query.data.split(':')[1][1]) - 1)
-        db.update_square(user_id, square)
-        moves = [move.to_square for move in board.legal_moves if move.from_square == square]
-        if not moves:
-            await callback_query.answer("Нет доступных ходов")
+        piece = board.piece_at(square)
+
+        # Проверка, соответствует ли выбранная фигура текущему игроку
+        if piece is not None and ((board.turn == chess.WHITE and piece.color != chess.WHITE) or (board.turn == chess.BLACK and piece.color != chess.BLACK)):
+            await callback_query.answer("Вы играете за " + ("белых" if board.turn == chess.WHITE else "черных"))
             return
-        keyboard = create_board_keyboard(board, highlight_moves=set(moves))
-        await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
-        await bot.edit_message_reply_markup(callback_query.from_user.id, callback_query.message.message_id, reply_markup=keyboard)
+
+        if db.selected_square(user_id) == square:
+            db.update_square(user_id, None)
+            keyboard = create_board_keyboard(board)
+        else:
+            db.update_square(user_id, square)
+            moves = [move.to_square for move in board.legal_moves if move.from_square == square]
+            highlight_moves = set(moves) if moves else None
+            keyboard = create_board_keyboard(board, highlight_moves=highlight_moves)
+
+        try:
+            await bot.edit_message_reply_markup(chat_id=user_id, message_id=message_id_two, reply_markup=keyboard)
+        except MessageNotModified:
+            pass
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('move:'))
 async def make_move(callback_query: types.CallbackQuery):
@@ -77,7 +91,8 @@ async def make_move(callback_query: types.CallbackQuery):
         fen = db.select_board(user_id)
         board = chess.Board(fen)
         to_square = chess.square(chess.FILE_NAMES.index(callback_query.data.split(':')[1][0]), int(callback_query.data.split(':')[1][1]) - 1)
-        message_id = db.check_message_ids(user_id)
+        message_id_two = db.check_message_ids(user_id)
+        message_id = db.select_message_id_chess(user_id)
         move = chess.Move(selected_square, to_square)
         if move in board.legal_moves:
             is_promotion = (board.piece_type_at(move.from_square) == chess.PAWN and
@@ -93,7 +108,7 @@ async def make_move(callback_query: types.CallbackQuery):
                 db.update_board(user_id, fen)
                 keyboard = create_board_keyboard(board)
                 await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
-                await bot.edit_message_reply_markup(callback_query.from_user.id, callback_query.message.message_id, reply_markup=keyboard)
+                await bot.edit_message_reply_markup(chat_id=user_id, message_id=message_id_two, reply_markup=keyboard)
         else:
             await callback_query.answer("Невозможный ход")
 
@@ -114,7 +129,7 @@ async def promote_pawn(callback_query: types.CallbackQuery):
         if move in board.legal_moves:
             board.push(move)
             keyboard = create_board_keyboard(board)
-            await bot.edit_message_text(chat_id=callback_query.message.chat.id, message_id=callback_query.message.message_id, text="Доска обновлена", reply_markup=keyboard)
+            await bot.edit_message_text(chat_id=callback_query.message.chat.id, text="Доска обновлена", reply_markup=keyboard)
         else:
             await callback_query.answer("Невозможный ход")
 
