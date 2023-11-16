@@ -4,7 +4,6 @@ from aiogram.utils.exceptions import MessageNotModified
 import config as cfg
 import functions as fnc
 import logging
-import buttons as bts
 import chess
 
 logging.basicConfig(level=logging.INFO)
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 bot = Bot(cfg.TOKEN)
 dp = Dispatcher(bot)
-db = DataBasa("localhost", "5432", "chess", "chess_user", "chess_pass")
+db = DataBasa("192.168.1.37", "5432", "chess", "chess_user", "chess828282")
 
 piece_to_emoji = {
     'P': "♙", 'N': "♘", 'B': "♗", 'R': "♖", 'Q': "♕", 'K': "♔",
