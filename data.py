@@ -95,7 +95,7 @@ class DataBasa:
 
     def add_game_chess(self, id_1, id_2, message_id, message_id_two, board):
         with self.connect:
-            self.cursor.execute("INSERT INTO chess_game(id_1, id_2, queue, message_id, message_id_two, board) VALUES(%s, %s, %s, %s, %s, %s)", (id_1, id_2, id_2, message_id, message_id_two, board,))
+            self.cursor.execute("INSERT INTO chess_game(id_1, id_2, message_id, message_id_two, board) VALUES(%s, %s, %s, %s, %s, %s)", (id_1, id_2, message_id, message_id_two, board,))
             self.connect.commit()
 
     def select_message_id_chess(self, id):
