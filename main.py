@@ -1,6 +1,7 @@
 from aiogram import Bot, Dispatcher, types, executor
 from data import DataBasa
 from aiogram.utils.exceptions import MessageNotModified
+from datetime import datetime, timedelta
 import config as cfg
 import functions as fnc
 import logging
