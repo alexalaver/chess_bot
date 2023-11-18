@@ -87,6 +87,7 @@ async def make_move(callback_query: types.CallbackQuery):
         if selected_square is None:
             await callback_query.answer("Ошибка: начальная клетка не выбрана.")
             return
+
         two_user_id = db.check_two_user_id(user_id)
         fen = db.select_board(user_id)
         board = chess.Board(fen)
@@ -94,6 +95,7 @@ async def make_move(callback_query: types.CallbackQuery):
         message_id_two = db.check_message_ids(user_id)
         message_id = db.select_message_id_chess(user_id)
         move = chess.Move(selected_square, to_square)
+
         if move in board.legal_moves:
             if board.is_kingside_castling(move) or board.is_queenside_castling(move):
                 board.push(move)
@@ -105,6 +107,8 @@ async def make_move(callback_query: types.CallbackQuery):
 
             fen = board.fen()
             db.update_board(user_id, fen)
+            db.update_current_turn(user_id, not board.turn)
+
             keyboard = create_board_keyboard(board)
             await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
             await bot.edit_message_reply_markup(chat_id=user_id, message_id=message_id_two, reply_markup=keyboard)

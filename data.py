@@ -200,10 +200,15 @@ class DataBasa:
 
     def select_promotion_square(self, id):
         with self.connect:
-            self.cursor.execute("SELECT promotion_square FROM chess_game WHERE id_1=% OR id_2=%", (id, id,))
+            self.cursor.execute("SELECT promotion_square FROM chess_game WHERE id_1=%s OR id_2=%s", (id, id,))
             return self.cursor.fetchone()[0]
 
     def update_promotion_square(self, id, promotion):
         with self.connect:
-            self.cursor.execute("UPDATE chess_game SET promotion_square=%s WHERE id_1=% OR id_2=%", (promotion, id, id,))
+            self.cursor.execute("UPDATE chess_game SET promotion_square=%s WHERE id_1=%s OR id_2=%s", (promotion, id, id,))
+            self.connect.commit()
+
+    def update_current_turn(self, id, current):
+        with self.connect:
+            self.cursor.execute("UPDATE chess_game SET current_turn=%s WHERE id_1=%s OR id_2=%s", (current, id, id,))
             self.connect.commit()
