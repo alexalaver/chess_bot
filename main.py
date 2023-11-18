@@ -94,25 +94,24 @@ async def make_move(callback_query: types.CallbackQuery):
         message_id = db.select_message_id_chess(user_id)
         move = chess.Move(selected_square, to_square)
         if move in board.legal_moves:
-            is_promotion = (board.piece_type_at(move.from_square) == chess.PAWN and
-                            (chess.square_rank(move.to_square) == 0 or chess.square_rank(move.to_square) == 7))
-            if is_promotion:
-                promotion_square = move.to_square
-                db.update_promotion_square(user_id, promotion_square)
-                keyboard = create_promotion_keyboard()
-                await bot.send_message(callback_query.from_user.id, "Выберите фигуру для превращения пешки", reply_markup=keyboard)
-            else:
+            if board.is_kingside_castling(move) or board.is_queenside_castling(move):
                 board.push(move)
-                fen = board.fen()
-                db.update_board(user_id, fen)
-                keyboard = create_board_keyboard(board)
-                await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
-                await bot.edit_message_reply_markup(chat_id=user_id, message_id=message_id_two, reply_markup=keyboard)
+            elif board.is_pseudo_legal(move) and board.is_legal(move):
+                board.push(move)
+            else:
+                await callback_query.answer("Невозможный ход")
+                return
+
+            fen = board.fen()
+            db.update_board(user_id, fen)
+            keyboard = create_board_keyboard(board)
+            await bot.edit_message_reply_markup(chat_id=two_user_id, message_id=message_id, reply_markup=keyboard)
+            await bot.edit_message_reply_markup(chat_id=user_id, message_id=message_id_two, reply_markup=keyboard)
+
+            if board.is_checkmate():
+                await bot.send_message(callback_query.from_user.id, "МАТ СДЕЛАН")
         else:
             await callback_query.answer("Невозможный ход")
-
-        if board.is_checkmate():
-            await bot.send_message(callback_query.from_user.id, "МАТ СДЕЛАН")
 
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('promote_to:'))
